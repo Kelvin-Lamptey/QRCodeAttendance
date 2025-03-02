@@ -1,0 +1,7 @@
+# Create project directories
+mkdir -p attendance_system/static/models
+mkdir -p attendance_system/static/css
+mkdir -p attendance_system/static/js
+mkdir -p attendance_system/templates/admin
+mkdir -p attendance_system/uploads
+mkdir -p attendance_system/instance 

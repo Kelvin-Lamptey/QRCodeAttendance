@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Attendance System{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Admin Dashboard</h1>
+        <div class="space-x-4">
+            <a href="{{ url_for('new_student') }}" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Add Student
+            </a>
+            <a href="{{ url_for('new_session') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Create Session
+            </a>
+        </div>
+    </div>
+
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold mb-4">Students</h2>
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Face Encoding</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for student in students %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">{{ student.name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">{{ student.email }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if student.face_encoding %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Enrolled
+                            </span>
+                            {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                Not Enrolled
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button onclick="deleteStudent({{ student.id }}, '{{ student.name }}')"
+                                    class="text-red-600 hover:text-red-900">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div>
+        <h2 class="text-2xl font-bold mb-4">Sessions</h2>
+        <div class="bg-gray-50 rounded-lg p-4">
+            {% if sessions %}
+                <div class="divide-y divide-gray-200">
+                    {% for session in sessions %}
+                        <div class="py-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="text-lg font-medium">{{ session.name }}</h4>
+                                    <p class="text-sm text-gray-500">
+                                        Date: {{ session.date.strftime('%Y-%m-%d') }}
+                                    </p>
+                                </div>
+                            </div>
+                            {% if session.qr_code %}
+                                <div class="mt-2">
+                                    <img src="data:image/png;base64,{{ session.qr_code }}" 
+                                         alt="QR Code for {{ session.name }}"
+                                         class="w-32 h-32">
+                                    <a href="{{ url_for('attendance', session_id=session.id) }}" 
+                                       class="text-sm text-blue-600 hover:text-blue-800"
+                                       target="_blank">
+                                        View Attendance Page
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-500 text-center py-4">No sessions created yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+async function deleteStudent(studentId, studentName) {
+    if (!confirm(`Are you sure you want to delete ${studentName}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/students/delete/${studentId}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        if (result.success) {
+            window.location.reload();
+        } else {
+            alert('Error deleting student: ' + result.error);
+        }
+    } catch (error) {
+        alert('Error deleting student: ' + error.message);
+    }
+}
+</script>
+{% endblock %} 
