@@ -99,7 +99,7 @@ def new_session():
         
         # Generate QR code
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(f"{request.host_url}attendance/{session.id}")
+        qr.add_data(f"https://cddae5e6-b6e2-4c27-8fad-9bda7226ca07-00-1zl9oyhes4kd3.riker.replit.dev/attendance/{session.id}")
         qr.make(fit=True)
         
         img = qr.make_image(fill_color="black", back_color="white")
