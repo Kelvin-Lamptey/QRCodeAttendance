@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block show_navbar %}{% endblock %}
+
 {% block content %}
 <style>
 @media (max-width: 768px) {
@@ -129,7 +131,7 @@ async function startFaceDetection() {
         
         console.log("Creating canvas for face detection, video dimensions:", video.videoWidth, video.videoHeight);
         const canvas = document.createElement('canvas');
-        canvas.id = 'overlay';
+    canvas.id = 'overlay';
         canvas.className = 'absolute top-0 left-0';
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -139,26 +141,26 @@ async function startFaceDetection() {
         existingOverlay.parentNode.replaceChild(canvas, existingOverlay);
         
         console.log("Setting up face detection interval");
-        faceCheckInterval = setInterval(async () => {
+    faceCheckInterval = setInterval(async () => {
             try {
-                const detection = await detectFace(video);
-                if (detection) {
+        const detection = await detectFace(video);
+        if (detection) {
                     console.log("Face detected");
-                    drawFaceDetections(video, canvas, detection);
+            drawFaceDetections(video, canvas, detection);
                     captureButton.disabled = false;
                     status.textContent = 'Face detected. Proceed to mark attendance.';
-                    status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
-                } else {
+            status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
+        } else {
                     console.log("No face detected");
-                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-                    captureButton.disabled = true;
-                    status.textContent = 'No face detected. Please position your face in the camera.';
-                    status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+            captureButton.disabled = true;
+            status.textContent = 'No face detected. Please position your face in the camera.';
+            status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
                 }
             } catch (error) {
                 console.error("Error in face detection interval:", error);
-            }
-        }, 100);
+        }
+    }, 100);
     } catch (error) {
         console.error("Error in startFaceDetection:", error);
         status.textContent = 'Error starting face detection: ' + error.message;
@@ -179,14 +181,14 @@ async function markAttendance() {
         if (!detection) {
             throw new Error('No face detected');
         }
-        
+
         // Get location
         const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject);
         });
 
         status.textContent = 'Sending attendance data...';
-        
+
         const response = await fetch('/api/mark-attendance', {
             method: 'POST',
             headers: {
@@ -200,15 +202,24 @@ async function markAttendance() {
                 longitude: position.coords.longitude
             })
         });
-        
+
         if (!response.ok) {
             const errorText = await response.text();
+            if( errorText['error'] == "No matching student found")
+            {
+                 // Display success message with student name
+                status.textContent = `No matching student found!`;
+                status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
+                console.log("No student found.")
+            }else{
+                throw new Error(`Server error: ${response.status}`);
+            }
             console.error('Server response:', errorText);
-            throw new Error(`Server error: ${response.status}`);
         }
 
         // Parse the JSON response
         const result = await response.json();
+        if(result["error"] == "`No matching student found")
         console.log('Attendance result:', result);
         
         // Display success message with student name

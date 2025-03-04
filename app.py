@@ -10,6 +10,8 @@ import numpy as np
 import json
 from numpy.linalg import norm
 from flask_wtf.csrf import CSRFProtect, generate_csrf
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -195,16 +197,67 @@ def delete_student(student_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
+# Add this function to get location name from coordinates
+def get_location_name(latitude, longitude):
+    try:
+        geolocator = Nominatim(user_agent="attendance_system")
+        location = geolocator.reverse(f"{latitude}, {longitude}", language='en')
+        return location.address if location else "Location not found"
+    except GeocoderTimedOut:
+        return "Location lookup timed out"
+    except Exception:
+        return "Location lookup failed"
+
+# Add this route to view session attendance
+@app.route('/admin/attendance/<int:session_id>')
+def session_attendance(session_id):
+    session = Session.query.get_or_404(session_id)
+    
+    # Query all attendance records for this session with student information
+    attendance_records = db.session.query(
+        Attendance, Student
+    ).join(
+        Student, Attendance.student_id == Student.id
+    ).filter(
+        Attendance.session_id == session_id
+    ).all()
+    
+    # Process attendance records to include location names
+    attendance_data = []
+    for attendance, student in attendance_records:
+        location_name = get_location_name(attendance.latitude, attendance.longitude)
+        attendance_data.append({
+            'student': student,
+            'attendance': attendance,
+            'location': location_name
+        })
+    
+    return render_template(
+        'admin/session_attendance.html',
+        session=session,
+        attendance_data=attendance_data
+    )
+
+@app.route('/admin/sessions/delete/<int:session_id>', methods=['POST'])
+@csrf.exempt
+def delete_session(session_id):
+    try:
+        session = Session.query.get_or_404(session_id)
+        
+        # Delete all attendance records for this session
+        Attendance.query.filter_by(session_id=session_id).delete()
+        
+        # Delete the session
+        db.session.delete(session)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Session deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     
-    # For development only - add warning about insecure context
-    print("WARNING: For camera access on all devices, this app should be served over HTTPS in production.")
-    
-    # Add option for development HTTPS
-    # Uncomment these lines and generate self-signed certificates for local HTTPS
-    # app.run(host='0.0.0.0', port=5000, ssl_context=('cert.pem', 'key.pem'))
-    
-    # Regular HTTP (works only on some browsers/devices)
+    print("WARNING: For camera access on all devices, this app must be served over HTTPS in production.")
     app.run(host='0.0.0.0', port=5000)

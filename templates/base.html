@@ -5,27 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Attendance System{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Face API Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 min-h-screen">
+    {% block show_navbar %}
     <nav class="bg-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <a href="/" class="text-xl font-bold">Attendance System</a>
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between">
+                <div class="flex space-x-7">
+                    <div>
+                        <a href="{{ url_for('index') }}" class="flex items-center py-4">
+                            <span class="font-semibold text-gray-500 text-lg">Attendance System</span>
+                        </a>
                     </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                        <a href="/" class="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-gray-300">Home</a>
-                        <a href="/admin" class="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-gray-300">Admin</a>
-                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <a href="{{ url_for('admin_dashboard') }}" class="py-4 px-2 text-gray-500 hover:text-gray-900">Admin</a>
                 </div>
             </div>
         </div>
     </nav>
+    {% endblock %}
 
     <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {% with messages = get_flashed_messages(with_categories=true) %}

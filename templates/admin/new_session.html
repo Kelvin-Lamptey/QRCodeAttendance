@@ -3,35 +3,33 @@
 {% block title %}Create New Session - Attendance System{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto bg-white shadow rounded-lg p-6">
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold">Create New Session</h2>
-        <a href="{{ url_for('admin_dashboard') }}" class="text-blue-600 hover:text-blue-800">Back to Dashboard</a>
-    </div>
+<div class="max-w-2xl mx-auto bg-white shadow rounded-lg p-6">
+    <h2 class="text-2xl font-bold mb-6">Create New Session</h2>
     
-    <form action="{{ url_for('new_session') }}" method="POST">
-        <div class="mb-4">
-            <label for="name" class="block text-gray-700 text-sm font-bold mb-2">Session Name</label>
-            <input type="text" name="name" id="name" required
-                   placeholder="e.g., Math Class - Week 1"
-                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+    <form method="POST" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Session Name</label>
+            <input type="text" name="name" required 
+                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
         </div>
         
-        <div class="mb-6">
-            <label for="date" class="block text-gray-700 text-sm font-bold mb-2">Session Date</label>
-            <input type="date" name="date" id="date" required
-                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Date</label>
+            <input type="date" name="date" required 
+                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
         </div>
         
-        <div class="flex items-center justify-between">
-            <button type="submit" 
-                    class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                Create Session
-            </button>
+        <div class="flex justify-end space-x-4">
             <a href="{{ url_for('admin_dashboard') }}" 
-               class="inline-block align-baseline font-bold text-sm text-green-500 hover:text-green-800">
+               class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Cancel
             </a>
+            <button type="submit" 
+                    class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Create Session
+            </button>
         </div>
     </form>
 </div>
