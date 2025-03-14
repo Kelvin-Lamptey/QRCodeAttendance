@@ -31,8 +31,8 @@ db = SQLAlchemy(app)
 # Models
 class Student(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(10), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
     face_encoding = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -72,10 +72,32 @@ def new_student():
             else:
                 data = request.form.to_dict()
             
+            # Check if the student ID already exists
+            existing_student = Student.query.filter_by(student_id=data.get('student_id')).first()
+            if existing_student:
+                return jsonify({'success': False, 'error': 'Student ID already exists'}), 400
+            
+            # Validate student ID format
+            student_id = data.get('student_id', '')
+            if not student_id.isdigit() or len(student_id) != 10:
+                return jsonify({'success': False, 'error': 'Invalid student ID format. Must be 10 digits'}), 400
+            
+            # Get face descriptor and ensure it's properly formatted
+            face_descriptor = data.get('face_descriptor', [])
+            if isinstance(face_descriptor, str):
+                face_descriptor = face_descriptor.strip("'")
+                face_descriptor = json.loads(face_descriptor)
+            
+            # Ensure it's a valid list of floats
+            face_descriptor = [float(x) for x in face_descriptor]
+            
+            # Store as a clean JSON string
+            face_encoding = json.dumps(face_descriptor)
+            
             student = Student(
+                student_id=student_id,
                 name=data.get('name', 'Unknown'),
-                email=data.get('email', 'unknown@example.com'),
-                face_encoding=json.dumps(data.get('face_descriptor', []))
+                face_encoding=face_encoding
             )
             
             db.session.add(student)
@@ -83,8 +105,9 @@ def new_student():
             
             return jsonify({'success': True, 'message': 'Student added successfully!'})
         except Exception as e:
+            print(f"Error saving student: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 400
-            
+        
     return render_template('admin/new_student.html')
 
 @app.route('/admin/sessions/new', methods=['GET', 'POST'])
@@ -99,7 +122,7 @@ def new_session():
         
         # Generate QR code
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(f"https://525ac8bc-5633-4c1b-a6cc-bdae797ad82c-00-2cormdjwnxgj.riker.replit.dev/attendance/{session.id}")
+        qr.add_data(f"{request.host_url}attendance/{session.id}")
         qr.make(fit=True)
         
         img = qr.make_image(fill_color="black", back_color="white")
@@ -120,24 +143,53 @@ def attendance(session_id):
     session = Session.query.get_or_404(session_id)
     return render_template('attendance.html', session=session)
 
-def find_matching_student(face_descriptor, threshold=0.4):
+def find_matching_student(face_descriptor, threshold=0.35):
     students = Student.query.filter(Student.face_encoding.isnot(None)).all()
+    
+    print(f"Total students with face encodings: {len(students)}")
     
     best_match = None
     best_distance = float('inf')
     
+    # Convert input face_descriptor to numpy array if it isn't already
+    face_descriptor = np.array(face_descriptor, dtype=np.float64)
+    
     for student in students:
         try:
-            stored_descriptor = np.array(json.loads(student.face_encoding))
+            # Parse the stored face encoding from JSON string to numpy array
+            stored_descriptor = np.array(json.loads(student.face_encoding.strip("'")), dtype=np.float64)
+            
+            # Calculate distance
             distance = norm(face_descriptor - stored_descriptor)
+            print(f"Distance for {student.name}: {distance}")
             
             if distance < threshold and distance < best_distance:
                 best_distance = distance
                 best_match = student
                 
         except Exception as e:
-            continue
-            
+            print(f"Error processing student {student.name}: {str(e)}")
+            # Try to clean up the stored encoding and retry
+            try:
+                # Remove any extra quotes and spaces
+                cleaned_encoding = student.face_encoding.strip("'").replace("'", '"')
+                stored_descriptor = np.array(json.loads(cleaned_encoding), dtype=np.float64)
+                
+                distance = norm(face_descriptor - stored_descriptor)
+                print(f"Distance for {student.name} (after cleanup): {distance}")
+                
+                if distance < threshold and distance < best_distance:
+                    best_distance = distance
+                    best_match = student
+            except Exception as e2:
+                print(f"Failed second attempt for {student.name}: {str(e2)}")
+                continue
+    
+    if best_match:
+        print(f"\nBest match found: {best_match.name} with distance: {best_distance}")
+    else:
+        print("\nNo match found above threshold")
+    
     return best_match
 
 @app.route('/api/mark-attendance', methods=['POST'])
@@ -149,8 +201,12 @@ def mark_attendance():
         
         matched_student = find_matching_student(face_descriptor)
         if not matched_student:
-            return jsonify({'error': 'No matching student found'}), 400
-            
+            # Redirect to success page with a message indicating unrecognized user
+            return jsonify({
+                'message': 'User not recognized',
+                'student_name': 'Unknown'
+            }), 200
+        
         attendance = Attendance(
             student_id=matched_student.id,
             session_id=data['session_id'],
@@ -173,9 +229,9 @@ def mark_attendance():
 def attendance_success( studentname):
     return render_template('attendance_success.html', student_name = studentname, datetime=datetime)
 
-@app.route('/static/models/<path:filename>')
-def serve_model(filename):
-    return send_from_directory('static/models', filename)
+# @app.route('/static/models/<path:filename>')
+# def serve_model(filename):
+#     return send_from_directory('static/models', filename)
 
 @app.route('/debug/students')
 def debug_students():

@@ -6,38 +6,35 @@
 <div class="max-w-2xl mx-auto bg-white shadow rounded-lg p-6">
     <h2 class="text-2xl font-bold mb-6">Add New Student</h2>
     
-    <div class="relative mb-6" style="width: 640px; height: 480px; margin: 0 auto;">
-        <video id="video" width="640" height="480" autoplay muted class="mx-auto border rounded-lg"></video>
-        <canvas id="overlay" class="absolute top-0 left-0" width="640" height="480"></canvas>
-    </div>
-    
-    <div id="status" class="text-center text-lg mb-4 p-2"></div>
-    
     <form id="studentForm" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Student ID</label>
+            <input type="text" name="student_id" required 
+                   pattern="[0-9]{10}" 
+                   title="Please enter a valid 10-digit student ID"
+                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+        </div>
+        
         <div>
             <label class="block text-sm font-medium text-gray-700">Name</label>
             <input type="text" name="name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
         </div>
         
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Email</label>
-            <input type="email" name="email" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-        </div>
-        
         <input type="hidden" name="face_descriptor" id="faceDescriptor">
         
-        <div class="flex justify-center space-x-4 mt-4 relative z-10">
-            <button type="button" id="startCamera" class="bg-green-500 text-white px-4 py-2 rounded">
-                Start Camera
-            </button>
-            <button type="button" id="captureFace" class="bg-blue-500 text-white px-4 py-2 rounded" disabled>
-                Capture Face
-            </button>
-            <button type="submit" id="submitForm" class="bg-purple-500 text-white px-4 py-2 rounded" disabled>
-                Save Student
+        <div class="flex justify-center space-x-4 mt-4">
+            <button type="button" id="readyButton" class="bg-green-500 text-white px-4 py-2 rounded">
+                Ready
             </button>
         </div>
     </form>
+    
+    <div class="relative mt-6" style="width: 640px; height: 480px; margin: 0 auto;">
+        <video id="video" width="640" height="480" autoplay muted class="mx-auto border rounded-lg"></video>
+        <canvas id="overlay" class="absolute top-0 left-0" width="640" height="480"></canvas>
+    </div>
+    
+    <div id="status" class="text-center text-lg mb-4 p-2"></div>
 </div>
 
 <script src="{{ url_for('static', filename='js/face-recognition.js') }}"></script>
@@ -45,13 +42,24 @@
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const status = document.getElementById('status');
-const startButton = document.getElementById('startCamera');
-const captureButton = document.getElementById('captureFace');
-const submitButton = document.getElementById('submitForm');
 const form = document.getElementById('studentForm');
+const readyButton = document.getElementById('readyButton');
 
-let isProcessing = false;
 let faceCheckInterval;
+
+readyButton.addEventListener('click', () => {
+    status.textContent = 'Loading face recognition models...';
+    loadModels().then(modelsLoaded => {
+        if (modelsLoaded) {
+            status.textContent = 'Ready to start. Initializing camera...';
+            status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
+            initializeCamera();
+        } else {
+            status.textContent = 'Error loading models. Please try again.';
+            status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
+        }
+    });
+});
 
 async function initializeCamera() {
     try {
@@ -68,7 +76,6 @@ async function initializeCamera() {
         
         // Start face detection after camera is initialized
         video.addEventListener('play', startFaceDetection);
-        captureButton.disabled = false;
     } catch (error) {
         status.textContent = 'Error accessing camera: ' + error.message;
         status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
@@ -76,117 +83,88 @@ async function initializeCamera() {
 }
 
 async function startFaceDetection() {
-    const canvas = faceapi.createCanvasFromMedia(video);
-    canvas.id = 'overlay';
-    canvas.className = 'absolute top-0 left-0';
-    canvas.width = video.width;
-    canvas.height = video.height;
-    
-    // Replace the existing overlay with the new canvas
-    const existingOverlay = document.getElementById('overlay');
-    existingOverlay.parentNode.replaceChild(canvas, existingOverlay);
-    
-    faceCheckInterval = setInterval(async () => {
-        const detection = await detectFace(video);
-        if (detection) {
-            drawFaceDetections(video, canvas, detection);
-            captureButton.disabled = false;
-            status.textContent = 'Face detected. Proceed to capture face data.';
-            status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
-        } else {
-            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-            captureButton.disabled = true;
-            status.textContent = 'No face detected. Please position your face in the camera.';
-            status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
-        }
-    }, 100);
-}
-
-async function captureFace() {
     try {
-        const detection = await detectFace(video);
-        if (detection) {
-            document.getElementById('faceDescriptor').value = JSON.stringify(Array.from(detection.descriptor));
-            submitButton.disabled = false;
-            status.textContent = 'Face captured! You can now save the student.';
-            status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
-        } else {
-            submitButton.disabled = true;
-            status.textContent = 'No face detected. Please try again.';
-            status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
-        }
+        const canvas = document.createElement('canvas');
+        canvas.id = 'overlay';
+        canvas.className = 'absolute top-0 left-0';
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const existingOverlay = document.getElementById('overlay');
+        existingOverlay.parentNode.replaceChild(canvas, existingOverlay);
+
+        faceCheckInterval = setInterval(async () => {
+            try {
+                const detection = await detectFace(video);
+                if (detection) {
+                    console.log("Face detected");
+                    drawFaceDetections(video, canvas, detection);
+                    status.textContent = 'Face detected. Capturing...';
+                    status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
+
+                    // Automatically capture face after 1 second
+                    clearInterval(faceCheckInterval); // Stop further detection
+                    setTimeout(() => {
+                        captureFace(detection);
+                    }, 1000);
+                } else {
+                    console.log("No face detected");
+                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+                    status.textContent = 'No face detected. Please position your face in the camera.';
+                    status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
+                }
+            } catch (error) {
+                console.error("Error in face detection interval:", error);
+            }
+        }, 100);
     } catch (error) {
-        status.textContent = 'Error capturing face: ' + error.message;
+        console.error("Error in startFaceDetection:", error);
+        status.textContent = 'Error starting face detection: ' + error.message;
         status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
     }
 }
 
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
+async function captureFace(detection) {
     try {
-        // Get the face descriptor from the hidden input
-        const faceDescriptorStr = document.getElementById('faceDescriptor').value;
-        let faceDescriptorArray;
+        status.textContent = 'Capturing face data (please stay still)...';
+        status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
+
+        // Get multiple samples
+        const averageDescriptor = await getAverageFaceDescriptor(video);
         
-        try {
-            // Parse the JSON string to get the actual array
-            faceDescriptorArray = JSON.parse(faceDescriptorStr);
-        } catch (error) {
-            console.error('Error parsing face descriptor:', error);
-            status.textContent = 'Error parsing face data. Please try capturing again.';
-            status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
-            return;
+        if (!averageDescriptor) {
+            throw new Error('Could not get a good face sample. Please try again.');
         }
-        
-        // Build the data object with the actual face descriptor
-        const formData = {
-            name: form.querySelector('[name="name"]').value,
-            email: form.querySelector('[name="email"]').value,
-            face_descriptor: faceDescriptorArray
-        };
-        
-        console.log('Sending student data with face descriptor');
-        
+
+        document.getElementById('faceDescriptor').value = JSON.stringify(Array.from(averageDescriptor));
+        status.textContent = 'Face captured! Saving student...';
+        status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
+
+        // Use AJAX to submit the form data
+        const formData = new FormData(form);
         const response = await fetch('/admin/students/new', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'X-CSRFToken': '{{ csrf_token() }}'
             },
-            body: JSON.stringify(formData)
+            body: formData
         });
-        
-        if (!response.ok) {
-            const text = await response.text();
-            console.log('Response status:', response.status);
-            console.log('Response text:', text);
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
+
         const result = await response.json();
         if (result.success) {
-            window.location.href = '/admin';
+            status.textContent = 'Student saved successfully!';
+            status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
+            setTimeout(() => {
+                window.location.href = '/admin';
+            }, 2000);
         } else {
             throw new Error(result.error || 'Failed to save student');
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error capturing face:', error);
         status.textContent = 'Error: ' + error.message;
         status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
     }
-});
-
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    status.textContent = 'Loading face recognition models...';
-    const modelsLoaded = await loadModels();
-    if (modelsLoaded) {
-        startButton.disabled = false;
-        status.textContent = 'Ready to start. Click "Start Camera"';
-    }
-});
-
-startButton.addEventListener('click', initializeCamera);
-captureButton.addEventListener('click', captureFace);
+}
 </script>
 {% endblock %} 

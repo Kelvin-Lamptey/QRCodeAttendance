@@ -1,10 +1,15 @@
 from app import app, db
+from datetime import datetime
 
-def init_database():
+def init_db():
     with app.app_context():
-        # Create all database tables
+        # Drop all existing tables
+        db.drop_all()
+        
+        # Create all tables with new schema
         db.create_all()
-        print("Database tables created successfully!")
+        
+        print("Database initialized with new schema")
 
-if __name__ == "__main__":
-    init_database() 
+if __name__ == '__main__':
+    init_db() 
