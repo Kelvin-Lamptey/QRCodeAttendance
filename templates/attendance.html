@@ -195,15 +195,14 @@ async function markAttendance(detection) {
             // Stop camera
             video.srcObject.getTracks().forEach(track => track.stop());
 
-            // Redirect after 2 seconds
-            setTimeout(() => {
-                window.location.href = `/attendance/success/${result.student_name}`;
-            }, 2000);
+            // Redirect to success page with location status
+            window.location.href = `/attendance/success/${encodeURIComponent(result.student_name)}?in_classroom=${result.in_classroom}`;
         }
     } catch (error) {
         console.error('Error:', error);
         status.textContent = 'Error: ' + error.message;
         status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
+        startFaceDetection(); // Restart detection on error
     }
 }
 

@@ -1,23 +1,45 @@
 {% extends "base.html" %}
 
-{% block show_navbar %}{% endblock %}
+{% block title %}Attendance Marked - Attendance System{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto bg-white shadow rounded-lg p-6 text-center">
-    <div class="text-green-500 mb-4">
-        <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-        </svg>
-    </div>
-    {% if student_name == 'Unknown' %}
-        <h2 class="text-2xl font-bold mb-4">User Not Recognized</h2>
-        <p class="text-gray-600 mb-6">Your face was not recognized. Please try again or contact support.</p>
-    {% else %}
-        <h2 class="text-2xl font-bold mb-4">Attendance Marked Successfully for {{ student_name }}!</h2>
-        <p class="text-gray-600 mb-6">Your attendance has been recorded. You can close this window.</p>
-    {% endif %}
-    <div class="text-sm text-gray-500">
-        Timestamp: {{ datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}
+<div class="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
+    <div class="relative py-3 sm:max-w-xl sm:mx-auto">
+        <div class="absolute inset-0 bg-gradient-to-r from-green-400 to-blue-500 shadow-lg transform -skew-y-6 sm:skew-y-0 sm:-rotate-6 sm:rounded-3xl"></div>
+        <div class="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
+            <div class="max-w-md mx-auto">
+                <div class="divide-y divide-gray-200">
+                    <div class="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
+                        <div class="text-center">
+                            {% if student_name != 'Unknown' %}
+                                <h2 class="text-2xl font-bold text-green-600 mb-4">Attendance Marked Successfully!</h2>
+                                <p class="mb-2">Welcome, {{ student_name }}!</p>
+                                <p class="text-sm text-gray-500">{{ datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                
+                                {% if in_classroom %}
+                                    <div class="mt-4 p-2 bg-green-100 text-green-700 rounded-md">
+                                        <svg class="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        <p>You are inside the classroom</p>
+                                    </div>
+                                {% else %}
+                                    <div class="mt-4 p-2 bg-yellow-100 text-yellow-700 rounded-md">
+                                        <svg class="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                        </svg>
+                                        <p>Warning: You are outside the classroom</p>
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                <h2 class="text-2xl font-bold text-red-600 mb-4">Face Not Recognized</h2>
+                                <p>Sorry, we couldn't recognize your face. Please try again or contact the administrator.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %} 

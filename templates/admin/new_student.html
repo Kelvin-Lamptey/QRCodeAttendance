@@ -95,26 +95,33 @@ async function startFaceDetection() {
 
         faceCheckInterval = setInterval(async () => {
             try {
-                const detection = await detectFace(video);
-                if (detection) {
-                    console.log("Face detected");
-                    drawFaceDetections(video, canvas, detection);
+                const result = await detectFace(video);
+                if (result && result.detection) {  // Check for detection
+                    console.log("Face detected with descriptor");
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawFaceDetections(video, canvas, result.detection);
                     status.textContent = 'Face detected. Capturing...';
                     status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
 
                     // Automatically capture face after 1 second
                     clearInterval(faceCheckInterval); // Stop further detection
                     setTimeout(() => {
-                        captureFace(detection);
+                        captureFace(result.detection);
                     }, 1000);
                 } else {
-                    console.log("No face detected");
-                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+                    console.log("No face detected or no descriptor available");
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     status.textContent = 'No face detected. Please position your face in the camera.';
                     status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
                 }
             } catch (error) {
                 console.error("Error in face detection interval:", error);
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                status.textContent = 'Error detecting face. Please try again.';
+                status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
             }
         }, 100);
     } catch (error) {
@@ -129,14 +136,27 @@ async function captureFace(detection) {
         status.textContent = 'Capturing face data (please stay still)...';
         status.className = 'text-center text-lg mb-4 p-2 bg-yellow-100 text-yellow-700';
 
-        // Get multiple samples
-        const averageDescriptor = await getAverageFaceDescriptor(video);
+        // Use the descriptor from the detection directly if available
+        let faceDescriptor;
+        if (detection && detection.descriptor) {
+            faceDescriptor = detection.descriptor;
+        } else {
+            // Fallback to getting average descriptor
+            faceDescriptor = await getAverageFaceDescriptor(video);
+        }
         
-        if (!averageDescriptor) {
-            throw new Error('Could not get a good face sample. Please try again.');
+        if (!faceDescriptor) {
+            throw new Error('Could not get a valid face descriptor. Please try again.');
         }
 
-        document.getElementById('faceDescriptor').value = JSON.stringify(Array.from(averageDescriptor));
+        // Convert descriptor to array if it isn't already
+        const descriptorArray = Array.isArray(faceDescriptor) ? faceDescriptor : Array.from(faceDescriptor);
+
+        if (descriptorArray.length === 0) {
+            throw new Error('Face descriptor is empty. Please try again.');
+        }
+
+        document.getElementById('faceDescriptor').value = JSON.stringify(descriptorArray);
         status.textContent = 'Face captured! Saving student...';
         status.className = 'text-center text-lg mb-4 p-2 bg-green-100 text-green-700';
 
@@ -164,6 +184,12 @@ async function captureFace(detection) {
         console.error('Error capturing face:', error);
         status.textContent = 'Error: ' + error.message;
         status.className = 'text-center text-lg mb-4 p-2 bg-red-100 text-red-700';
+        
+        // Reset the detection process so user can try again
+        setTimeout(() => {
+            status.textContent = 'Please try again';
+            startFaceDetection();
+        }, 2000);
     }
 }
 </script>

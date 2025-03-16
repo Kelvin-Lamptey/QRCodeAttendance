@@ -16,22 +16,22 @@
             <h3 class="text-lg font-medium">Coordinates</h3>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Corner 1</label>
-                <button type="button" onclick="getCoordinates('corner1')" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 1</button>
+                <button type="button" onclick="getCoordinates(1)" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 1</button>
                 <input type="text" name="corner1" id="corner1" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Corner 2</label>
-                <button type="button" onclick="getCoordinates('corner2')" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 2</button>
+                <button type="button" onclick="getCoordinates(2)" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 2</button>
                 <input type="text" name="corner2" id="corner2" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Corner 3</label>
-                <button type="button" onclick="getCoordinates('corner3')" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 3</button>
+                <button type="button" onclick="getCoordinates(3)" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 3</button>
                 <input type="text" name="corner3" id="corner3" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Corner 4</label>
-                <button type="button" onclick="getCoordinates('corner4')" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 4</button>
+                <button type="button" onclick="getCoordinates(4)" class="bg-blue-500 text-white px-4 py-2 rounded">Get Corner 4</button>
                 <input type="text" name="corner4" id="corner4" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
             </div>
         </div>
@@ -51,15 +51,12 @@
 
 <script>
 function getCoordinates(corner) {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-            document.getElementById(corner).value = position.coords.latitude + ',' + position.coords.longitude;
-        }, function(error) {
-            console.error("Error getting coordinates: " + error.message);
-        });
-    } else {
-        alert("Geolocation is not supported by this browser.");
-    }
+    navigator.geolocation.getCurrentPosition((position) => {
+        const coords = `${position.coords.latitude}, ${position.coords.longitude}`;
+        document.getElementById(`corner${corner}`).value = coords;
+    }, (error) => {
+        alert('Unable to retrieve your location. Please allow location access.');
+    });
 }
 
 async function saveClassroom() {
@@ -80,4 +77,4 @@ async function saveClassroom() {
     }
 }
 </script>
-{% endblock %}
+{% endblock %} 

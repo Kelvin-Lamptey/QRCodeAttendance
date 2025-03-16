@@ -40,6 +40,7 @@ class Session(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     date = db.Column(db.DateTime, nullable=False)
+    classroom_id = db.Column(db.Integer, db.ForeignKey('classroom.id'), nullable=False)
     qr_code = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -117,31 +118,46 @@ def new_student():
 
 @app.route('/admin/sessions/new', methods=['GET', 'POST'])
 def new_session():
+    import logging
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+
     if request.method == 'POST':
-        name = request.form['name']
-        date = datetime.strptime(request.form['date'], '%Y-%m-%d')
-        
-        session = Session(name=name, date=date)
-        db.session.add(session)
-        db.session.commit()
-        
-        # Generate QR code
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(f"{request.host_url}attendance/{session.id}")
-        qr.make(fit=True)
-        
-        img = qr.make_image(fill_color="black", back_color="white")
-        buffered = BytesIO()
-        img.save(buffered, format="PNG")
-        qr_code = base64.b64encode(buffered.getvalue()).decode()
-        
-        session.qr_code = qr_code
-        db.session.commit()
-        
-        flash('Session created successfully!', 'success')
-        return redirect(url_for('admin_dashboard'))
-    
-    return render_template('admin/new_session.html')
+        try:
+            name = request.form['name']
+            classroom_id = request.form['classroom_id']
+            date = datetime.strptime(request.form['date'], '%Y-%m-%d')
+            
+            session = Session(name=name, date=date, classroom_id=classroom_id)
+            logging.info("Session created successfully.")
+
+            db.session.add(session)
+            db.session.commit()
+            
+            # Generate QR code
+            qr = qrcode.QRCode(version=1, box_size=10, border=5)
+            qr.add_data(f"{request.host_url}attendance/{session.id}")
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            buffered = BytesIO()
+            img.save(buffered, format="PNG")
+            qr_code = base64.b64encode(buffered.getvalue()).decode()
+            
+            session.qr_code = qr_code
+            db.session.commit()
+            
+            flash('Session created successfully!', 'success')
+            logging.info("Redirecting to admin dashboard.")
+            return redirect(url_for('admin_dashboard'))
+        except Exception as e:
+            logging.error(f"Error creating session: {str(e)}")  # Log the error
+            flash('Error creating session. Please try again.', 'error')
+            return redirect(url_for('admin_dashboard'))
+
+    classrooms = Classroom.query.all()  # Or however you fetch your classrooms
+    return render_template('admin/new_session.html', classrooms=classrooms)
 
 @app.route('/attendance/<int:session_id>')
 def attendance(session_id):
@@ -197,27 +213,68 @@ def find_matching_student(face_descriptor, threshold=0.35):
     
     return best_match
 
+def point_inside_polygon(point, polygon_coords):
+    """
+    Check if a point is inside a polygon using ray casting algorithm
+    point: tuple of (latitude, longitude)
+    polygon_coords: list of tuples [(lat1, lon1), (lat2, lon2), ...]
+    """
+    x, y = point
+    n = len(polygon_coords)
+    inside = False
+    
+    p1x, p1y = polygon_coords[0]
+    for i in range(n + 1):
+        p2x, p2y = polygon_coords[i % n]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    
+    return inside
+
 @app.route('/api/mark-attendance', methods=['POST'])
 @csrf.exempt
 def mark_attendance():
     try:
         data = request.json
         face_descriptor = np.array(data['face_descriptor'])
+        session_id = data['session_id']
+        latitude = data['latitude']
+        longitude = data['longitude']
+        
+        # Get the session and its classroom
+        session = Session.query.get_or_404(session_id)
+        classroom = Classroom.query.get_or_404(session.classroom_id)
+        
+        # Parse classroom coordinates
+        classroom_coords = json.loads(classroom.coordinates)
+        polygon_coords = []
+        for coord in classroom_coords:
+            lat, lon = map(float, coord.split(','))
+            polygon_coords.append((lat, lon))
+        
+        # Check if student is in classroom
+        is_in_classroom = point_inside_polygon((float(latitude), float(longitude)), polygon_coords)
         
         matched_student = find_matching_student(face_descriptor)
         if not matched_student:
-            # Redirect to success page with a message indicating unrecognized user
             return jsonify({
                 'message': 'User not recognized',
-                'student_name': 'Unknown'
+                'student_name': 'Unknown',
+                'in_classroom': is_in_classroom
             }), 200
         
         attendance = Attendance(
             student_id=matched_student.id,
-            session_id=data['session_id'],
+            session_id=session_id,
             timestamp=datetime.now(),
-            latitude=data['latitude'],
-            longitude=data['longitude']
+            latitude=latitude,
+            longitude=longitude
         )
         
         db.session.add(attendance)
@@ -225,14 +282,19 @@ def mark_attendance():
         
         return jsonify({
             'message': 'Attendance marked successfully',
-            'student_name': matched_student.name
+            'student_name': matched_student.name,
+            'in_classroom': is_in_classroom
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/attendance/success/<studentname>')
-def attendance_success( studentname):
-    return render_template('attendance_success.html', student_name = studentname, datetime=datetime)
+def attendance_success(studentname):
+    in_classroom = request.args.get('in_classroom', 'true').lower() == 'true'
+    return render_template('attendance_success.html', 
+                         student_name=studentname, 
+                         datetime=datetime,
+                         in_classroom=in_classroom)
 
 @app.route('/static/models/<path:filename>')
 def serve_model(filename):
@@ -320,12 +382,15 @@ def delete_session(session_id):
 @csrf.exempt
 def new_classroom():
     if request.method == 'POST':
+        name = request.form['name']
         try:
-            name = request.form['name']
             corner1 = request.form['corner1']
             corner2 = request.form['corner2']
             corner3 = request.form['corner3']
             corner4 = request.form['corner4']
+            
+            # Log the received coordinates for debugging
+            print(f"Received coordinates: corner1={corner1}, corner2={corner2}, corner3={corner3}, corner4={corner4}")
             
             # Validate that all corners are provided
             if not all([corner1, corner2, corner3, corner4]):
@@ -347,6 +412,61 @@ def new_classroom():
     
     # Render the form for adding a new classroom
     return render_template('admin/new_classroom.html')
+
+@app.route('/admin/classrooms')
+def list_classrooms():
+    classrooms = Classroom.query.all()
+    return render_template('admin/classrooms.html', classrooms=classrooms)
+
+@app.route('/admin/classrooms/edit/<int:classroom_id>', methods=['GET', 'POST'])
+@csrf.exempt
+def edit_classroom(classroom_id):
+    classroom = Classroom.query.get_or_404(classroom_id)
+    
+    if request.method == 'POST':
+        try:
+            name = request.form['name']
+            corner1 = request.form['corner1']
+            corner2 = request.form['corner2']
+            corner3 = request.form['corner3']
+            corner4 = request.form['corner4']
+            
+            # Validate that all corners are provided
+            if not all([corner1, corner2, corner3, corner4]):
+                return jsonify({'success': False, 'error': 'All corners must be provided.'}), 400
+            
+            # Update classroom
+            classroom.name = name
+            classroom.coordinates = json.dumps([corner1, corner2, corner3, corner4])
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Classroom updated successfully!'})
+        except Exception as e:
+            print(f"Error updating classroom: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 400
+    
+    coordinates = json.loads(classroom.coordinates)
+    return render_template('admin/edit_classroom.html', classroom=classroom, coordinates=coordinates)
+
+@app.route('/admin/classrooms/delete/<int:classroom_id>', methods=['POST'])
+@csrf.exempt
+def delete_classroom(classroom_id):
+    try:
+        classroom = Classroom.query.get_or_404(classroom_id)
+        
+        # Check if classroom is being used in any sessions
+        sessions = Session.query.filter_by(classroom_id=classroom_id).first()
+        if sessions:
+            return jsonify({
+                'success': False, 
+                'error': 'Cannot delete classroom as it is being used in one or more sessions.'
+            }), 400
+        
+        db.session.delete(classroom)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Classroom deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 if __name__ == '__main__':
     with app.app_context():

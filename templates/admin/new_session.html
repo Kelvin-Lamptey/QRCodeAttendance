@@ -16,8 +16,19 @@
         </div>
         
         <div>
+            <label class="block text-sm font-medium text-gray-700">Classroom</label>
+            <select name="classroom_id" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">Select a classroom</option>
+                {% for classroom in classrooms %}
+                <option value="{{ classroom.id }}">{{ classroom.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div>
             <label class="block text-sm font-medium text-gray-700">Date</label>
-            <input type="date" name="date" required 
+            <input type="date" name="date" id="date" required 
                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
         </div>
         
